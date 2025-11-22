@@ -15,22 +15,14 @@ async function main() {
     });
 
     console.log("Getting storage info...");
-    const info = await synapse.getStorageInfo();
+    const info = await synapse.storage.getStorageInfo();
     console.log("Providers:", info.providers.length);
 
     for (const p of info.providers) {
-        console.log(`\nProvider ID: ${p.owner} (Owner?)`);
-        console.log(`Address: ${p.owner}`);
-        console.log(`PDP URL: ${p.pdpUrl}`);
-        console.log(`Retrieval URL: ${p.pieceRetrievalUrl}`);
+        console.log('Provider:', p.name);
+        console.log('PDP Data:', p.products.PDP?.data);
 
-        // Try to fetch PDP URL to see if it's reachable
-        try {
-            const res = await fetch(p.pdpUrl);
-            console.log(`PDP Ping: ${res.status} ${res.statusText}`);
-        } catch (e: any) {
-            console.log(`PDP Ping Failed: ${e.message}`);
-        }
+
     }
 }
 

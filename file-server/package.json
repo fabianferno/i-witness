@@ -6,9 +6,9 @@
   "main": "dist/index.js",
   "scripts": {
     "start": "node dist/index.js",
-    "dev": "nodemon --exec \"node --loader ts-node/esm\" src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "test": "ts-node test-upload.ts"
+    "test": "tsx test-upload.ts"
   },
   "keywords": [
     "filecoin",
@@ -19,7 +19,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@filoz/synapse-sdk": "^0.20.1",
+    "@filoz/synapse-sdk": "^0.36.0",
     "@types/morgan": "^1.9.10",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

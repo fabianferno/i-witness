@@ -1,6 +1,7 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import FormData from 'form-data';
 
 const API_URL = 'http://localhost:3000/api';
@@ -10,6 +11,14 @@ async function main() {
         console.log('🔍 Checking health...');
         const health = await axios.get(`${API_URL}/health`);
         console.log('✅ Health check passed:', health.data);
+
+        console.log('\n🔍 SETUP PAYMENT...');
+        try {
+            const payment = await axios.post(`${API_URL}/synapse/setup-payment`);
+            console.log('✅ Payment status:', payment.data);
+        } catch (e: any) {
+            console.log('⚠️ Could not setup payment (server might need funding):', e.message);
+        }
 
         console.log('\n🔍 Checking payment status...');
         try {
@@ -21,11 +30,12 @@ async function main() {
 
         console.log('\n📤 Uploading image with signature...');
         // Create a dummy image
-        const __dirname = path.dirname(new URL(import.meta.url).pathname);
+        const __dirname = path.dirname(fileURLToPath(import.meta.url));
         const imagePath = path.join(__dirname, 'test-image.png');
         // Create a simple 1x1 pixel PNG or just some random bytes pretending to be an image
         // For a valid image test, let's write a small buffer
-        const imageBuffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+        // Synapse requires > 127 bytes
+        const imageBuffer = Buffer.alloc(1024, 'a');
         fs.writeFileSync(imagePath, imageBuffer);
 
         const formData = new FormData();

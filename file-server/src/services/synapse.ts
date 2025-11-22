@@ -20,26 +20,20 @@ export const uploadToStorage = async (
 ) => {
   const synapse = await getSynapse();
 
-  // Create storage service (selects provider automatically)
-  // We can pass metadata here if supported, but SDK 0.20.1 createStorage options 
-  // don't seem to have metadata field directly in StorageServiceOptions 
-  // (it has callbacks, providerId, etc).
-  // Create storage service (selects provider automatically)
-  const storage = await synapse.createStorage();
-
-  const result = await storage.upload(data);
+  // Use StorageManager upload directly
+  const result = await synapse.storage.upload(data);
 
   return { pieceCid: result.commp, size: result.size };
 };
 
 export const downloadFromStorage = async (pieceCid: string) => {
   const synapse = await getSynapse();
-  return await synapse.download(pieceCid);
+  return await synapse.storage.download(pieceCid);
 };
 
 export const checkPaymentSetup = async () => {
   const synapse = await getSynapse();
-  const walletBalance = await synapse.payments.walletBalance("USDFC");
+  const walletBalance = await synapse.payments.balance("USDFC");
   const formattedBalance = ethers.formatUnits(walletBalance, 18);
 
   return {
@@ -58,26 +52,21 @@ export const setupPayment = async (amountStr: string = "2.5") => {
     throw new Error(`Insufficient USDFC balance. Have: ${ethers.formatUnits(walletBalance, 18)}, Need: ${amountStr}`);
   }
 
-  console.log("Depositing...");
-  const tx = await synapse.payments.deposit(depositAmount, "USDFC");
-  await tx.wait();
-  console.log("Deposit confirmed:", tx.hash);
+  console.log("Depositing & Approving service...");
 
-  console.log("Approving service...");
-  const storageInfo = await synapse.getStorageInfo();
-  const serviceAddress = storageInfo.serviceParameters.pandoraAddress;
-
-  const txApprove = await synapse.payments.approveService(
-    serviceAddress,
+  const txApprove = await synapse.payments.depositWithPermitAndApproveOperator(
+    depositAmount,
+    synapse.getWarmStorageAddress(),
     ethers.MaxUint256,
     ethers.MaxUint256,
+    ethers.MaxUint256, // maxLockupPeriod
     "USDFC"
   );
   await txApprove.wait();
   console.log("Approval confirmed:", txApprove.hash);
 
   return {
-    txHash: tx.hash,
+    txHash: txApprove.hash,
     approvalTxHash: txApprove.hash
   };
 };
