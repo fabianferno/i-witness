@@ -39,13 +39,13 @@ export function VerificationForm() {
     };
 
     return (
-        <Card className="w-full max-w-md mx-auto border-zinc-800 bg-zinc-900/50 backdrop-blur-sm">
+        <Card className="w-full max-w-md mx-auto border-zinc-800 bg-black/10 backdrop-blur-sm">
             <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-zinc-100">
-                    <ShieldCheck className="w-5 h-5 text-green-500" />
+                <CardTitle className="flex items-center gap-2 text-zinc-900">
+                    <ShieldCheck className="w-5 h-5 text-green-900" />
                     Verify Capture
                 </CardTitle>
-                <CardDescription className="text-zinc-400">
+                <CardDescription className="text-zinc-900">
                     Enter the IPFS CID of the capture package to verify its authenticity.
                 </CardDescription>
             </CardHeader>
@@ -56,14 +56,14 @@ export function VerificationForm() {
                             placeholder="ipfs://bafy..."
                             value={cid}
                             onChange={(e) => setCid(e.target.value)}
-                            className="bg-zinc-950/50 mb-4 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus-visible:ring-green-500/50"
+                            className="bg-zinc-900/50 mb-4 border-zinc-800 text-zinc-100 placeholder:text-zinc-400 focus-visible:ring-indigo-500/50"
                         />
                     </div>
                 </CardContent>
                 <CardFooter>
                     <Button
                         type="submit"
-                        className="w-full bg-green-600 hover:bg-green-700 text-white font-medium"
+                        className="w-full bg-black hover:bg-zinc-800 text-zinc-200 font-medium"
                         disabled={isLoading}
                     >
                         {isLoading ? (
