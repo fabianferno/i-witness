@@ -12,11 +12,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Database, Clock, FileText, Download, Loader2, Image as ImageIcon, Info, Hash, Layers, Activity, Maximize2, Minimize2, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
+import { Database, Clock, FileText, Download, Loader2, Image as ImageIcon, Info, Hash, Layers, Activity, Maximize2, Minimize2, ChevronDown, ChevronUp, CheckCircle2, Copy } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { verifySignature, addMetadataToPng } from "@/lib/utils";
 import { useEnsName } from "wagmi";
 import { sepolia } from "viem/chains";
+import { toast } from "sonner";
 
 interface Post {
   _id: string;
@@ -231,6 +232,12 @@ function PostCard({ post }: { post: Post }) {
     }
   };
 
+  const handleCopyCid = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(post.hash);
+    toast.success("CID copied to clipboard");
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -362,8 +369,27 @@ function PostCard({ post }: { post: Post }) {
           </div>
         </div>
       </div>
+      {/* <div className="flex items-center justify-between group/cid p-0 m-0 h-fit">
+        <div className="flex items-center overflow-hidden">
+          <Hash className="w-3 h-3 text-zinc-500 shrink-0" />
+          <p className="text-xs text-zinc-400 truncate font-mono">
+            {post.hash.slice(0, 12)}...{post.hash.slice(-4)}
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-3 w-3 text-zinc-500 hover:text-zinc-300 opacity-0 group-hover/cid:opacity-100 transition-opacity"
+          onClick={handleCopyCid}
+        >
+          <Copy className="w-3 h-3" />
+        </Button>
+      </div> */}
+      <CardContent className="p-3 border-t border-zinc-800/50 bg-black/20 flex flex-col gap-2">
+        {/* CID Row */}
 
-      <CardContent className="p-3 border-t border-zinc-800/50 bg-black/20">
+
+        {/* Name & Size Row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 overflow-hidden">
             <FileText className="w-3 h-3 text-zinc-500 shrink-0" />
