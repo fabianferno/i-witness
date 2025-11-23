@@ -257,7 +257,7 @@ function PostCard({ post }: { post: Post }) {
   };
 
   return (
-    <Card className="bg-black/10 py-0 border-zinc-800 hover:bg-black/20 transition-all overflow-hidden group flex flex-col h-full">
+    <Card className="bg-black/10 py-0 border-zinc-800 hover:bg-black/20 transition-all overflow-hidden group flex flex-col h-full gap-0">
       <div className="relative aspect-[4/3] w-full bg-zinc-900/50 overflow-hidden">
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center">
