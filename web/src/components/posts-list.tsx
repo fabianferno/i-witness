@@ -319,10 +319,10 @@ function PostCard({ post }: { post: Post }) {
                     <Info className="w-4 h-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 bg-zinc-950 border-zinc-800 overflow-hidden flex flex-col">
-                  <DialogHeader className="p-6 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-xl sticky top-0 z-10">
+                <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 bg-black/40 backdrop-blur-xl border-white/10 overflow-hidden flex flex-col shadow-2xl">
+                  <DialogHeader className="p-6 border-b border-white/10 bg-white/5 backdrop-blur-xl sticky top-0 z-10">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
+                      <div className="p-2 bg-white/5 rounded-lg border border-white/10">
                         <FileText className="w-5 h-5 text-zinc-100" />
                       </div>
                       <div>
@@ -341,8 +341,8 @@ function PostCard({ post }: { post: Post }) {
                     <div className="p-6">
                       {loading && (
                         <div className="flex flex-col items-center justify-center py-20">
-                          <Loader2 className="w-8 h-8 animate-spin text-zinc-500 mb-4" />
-                          <span className="text-zinc-500">Loading content details...</span>
+                          <Loader2 className="w-8 h-8 animate-spin text-zinc-400 mb-4" />
+                          <span className="text-zinc-400">Loading content details...</span>
                         </div>
                       )}
 
@@ -457,9 +457,9 @@ function ContentDisplay({ data }: { data: ContentData }) {
                   <ImageIcon className="w-4 h-4" />
                   Base Image
                 </h3>
-                <Badge variant="outline" className="bg-zinc-900 text-zinc-500 border-zinc-800">RGB</Badge>
+                <Badge variant="outline" className="bg-white/5 text-zinc-400 border-white/10">RGB</Badge>
               </div>
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden aspect-video relative group">
+              <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden aspect-video relative group">
                 <img
                   src={`data:image/png;base64,${baseImage}`}
                   alt="Base image"
@@ -476,9 +476,9 @@ function ContentDisplay({ data }: { data: ContentData }) {
                   <Layers className="w-4 h-4" />
                   Depth Map
                 </h3>
-                <Badge variant="outline" className="bg-zinc-900 text-zinc-500 border-zinc-800">Depth</Badge>
+                <Badge variant="outline" className="bg-white/5 text-zinc-400 border-white/10">Depth</Badge>
               </div>
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden aspect-video relative group">
+              <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden aspect-video relative group">
                 <img
                   src={`data:image/png;base64,${depthImage}`}
                   alt="Depth image"
@@ -494,7 +494,7 @@ function ContentDisplay({ data }: { data: ContentData }) {
       {/* Depth Data Statistics */}
       {depthData && (
         <div className="space-y-6">
-          <div className="flex items-center gap-3 pb-2 border-b border-zinc-800/50">
+          <div className="flex items-center gap-3 pb-2 border-b border-white/10">
             <Activity className="w-5 h-5 text-indigo-400" />
             <h3 className="text-lg font-semibold text-zinc-100">Depth Analysis</h3>
           </div>
@@ -511,7 +511,7 @@ function ContentDisplay({ data }: { data: ContentData }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Depth Statistics Bar Chart */}
             {depthStatsData.length > 0 && (
-              <Card className="bg-zinc-900/30 border-zinc-800/50">
+              <Card className="bg-white/5 border-white/10 shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-zinc-400">Value Distribution</CardTitle>
                 </CardHeader>
@@ -519,14 +519,14 @@ function ContentDisplay({ data }: { data: ContentData }) {
                   <div className="h-[200px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={depthStatsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                        <XAxis dataKey="name" stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                        <XAxis dataKey="name" stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={false} />
                         <Tooltip
-                          cursor={{ fill: '#27272a' }}
+                          cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                           contentStyle={{
-                            backgroundColor: '#18181b',
-                            border: '1px solid #27272a',
+                            backgroundColor: 'rgba(24, 24, 27, 0.9)',
+                            border: '1px solid rgba(255,255,255,0.1)',
                             borderRadius: '8px',
                             color: '#f4f4f5',
                             boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
@@ -546,7 +546,7 @@ function ContentDisplay({ data }: { data: ContentData }) {
 
             {/* Valid Pixels Pie Chart */}
             {pixelData.length > 0 && totalPixels > 0 && (
-              <Card className="bg-zinc-900/30 border-zinc-800/50">
+              <Card className="bg-white/5 border-white/10 shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-zinc-400">Data Quality</CardTitle>
                 </CardHeader>
@@ -570,8 +570,8 @@ function ContentDisplay({ data }: { data: ContentData }) {
                         </Pie>
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: '#18181b',
-                            border: '1px solid #27272a',
+                            backgroundColor: 'rgba(24, 24, 27, 0.9)',
+                            border: '1px solid rgba(255,255,255,0.1)',
                             borderRadius: '8px',
                             color: '#f4f4f5',
                           }}
@@ -593,7 +593,7 @@ function ContentDisplay({ data }: { data: ContentData }) {
             <Clock className="w-4 h-4" />
             Timestamp
           </h3>
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4">
             <p className="text-zinc-200 font-mono text-sm">
               {timestamp ? new Date(timestamp).toLocaleString() : 'N/A'}
             </p>
@@ -605,20 +605,20 @@ function ContentDisplay({ data }: { data: ContentData }) {
             <FileText className="w-4 h-4" />
             Signature
             {recoveredAddress && (
-              <Badge className="ml-auto bg-emerald-500/20 text-emerald-300 border-emerald-500/30 flex items-center gap-1">
+              <Badge className="ml-auto bg-emerald-500/10 text-emerald-400 border-emerald-500/20 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" />
                 Verified
               </Badge>
             )}
           </h3>
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 group relative overflow-hidden space-y-2">
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4 group relative overflow-hidden space-y-2">
             <div className="flex flex-col gap-1">
               <span className="text-xs text-zinc-500 uppercase tracking-wider">Signer</span>
               <p className="text-zinc-200 font-mono text-xs break-all">
                 {recoveredAddress || 'Verifying...'}
               </p>
             </div>
-            <div className="flex flex-col gap-1 border-t border-zinc-800/50 pt-2">
+            <div className="flex flex-col gap-1 border-t border-white/10 pt-2">
               <span className="text-xs text-zinc-500 uppercase tracking-wider">Signature Hash</span>
               <p className="text-zinc-400 font-mono text-[10px] break-all opacity-70 group-hover:opacity-100 transition-opacity">
                 {signature || 'No signature available'}
@@ -629,7 +629,7 @@ function ContentDisplay({ data }: { data: ContentData }) {
       </div>
 
       {/* Raw JSON (collapsible) */}
-      <div className="border-t border-zinc-800/50 pt-6">
+      <div className="border-t border-white/10 pt-6">
         <button
           onClick={() => setIsJsonOpen(!isJsonOpen)}
           className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors w-full"
@@ -639,7 +639,7 @@ function ContentDisplay({ data }: { data: ContentData }) {
         </button>
 
         {isJsonOpen && (
-          <div className="mt-4 bg-zinc-950 border border-zinc-800 rounded-xl p-4 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+          <div className="mt-4 bg-black/40 border border-white/10 rounded-xl p-4 overflow-hidden animate-in slide-in-from-top-2 duration-200">
             <pre className="text-[10px] text-zinc-400 font-mono overflow-x-auto whitespace-pre-wrap custom-scrollbar max-h-[300px]">
               {JSON.stringify(data, null, 2)}
             </pre>
@@ -652,7 +652,7 @@ function ContentDisplay({ data }: { data: ContentData }) {
 
 function StatsCard({ label, value, icon }: { label: string, value: string | number, icon: React.ReactNode }) {
   return (
-    <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-xl p-4 flex flex-col gap-2 hover:bg-zinc-900/50 transition-colors">
+    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col gap-2 hover:bg-white/10 transition-colors shadow-sm">
       <div className="flex items-center gap-2 text-zinc-500 text-xs font-medium uppercase tracking-wider">
         {icon}
         {label}
