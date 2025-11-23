@@ -198,7 +198,7 @@ function RegisterDeviceForm() {
                                 id="label"
                                 value={label}
                                 onChange={(e) => setLabel(e.target.value)}
-                                className="focus:ring-0 focus:border-0 focus:ring-offset-0 focus:ring-offset-black/10"
+                                className="focus:ring-0 bg-white/50 focus:border-0 focus:ring-offset-0 focus:ring-offset-black/10"
                                 placeholder="e.g. camera-01"
                                 disabled={!generatedKey || !!registrationSuccess}
                             />
@@ -232,7 +232,7 @@ function RegisterDeviceForm() {
                             )}
                         </div>
                         {existingSubnames.length > 0 ? (
-                            <div className="rounded-md bg-zinc-100 p-3 dark:bg-zinc-800 max-h-48 overflow-y-auto">
+                            <div className="rounded-md bg-black/10 p-3 dark:bg-zinc-800 max-h-48 overflow-y-auto">
                                 <div className="flex flex-wrap gap-2">
                                     {existingSubnames.map((subname, index) => (
                                         <Badge
