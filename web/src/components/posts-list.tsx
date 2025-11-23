@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,7 @@ import {
 import { Database, Clock, FileText, Download, Loader2, Image as ImageIcon, Info, Hash, Layers, Activity, Maximize2, Minimize2, ChevronDown, ChevronUp, CheckCircle2, Copy } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { verifySignature, addMetadataToPng } from "@/lib/utils";
-import { useEnsName } from "wagmi";
-import { sepolia } from "viem/chains";
+import { getNames } from "@/lib/namestone";
 import { toast } from "sonner";
 
 interface Post {
@@ -136,13 +135,20 @@ function PostCard({ post }: { post: Post }) {
   const [contentData, setContentData] = useState<ContentData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recoveredAddress, setRecoveredAddress] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [subname, setSubname] = useState<string | null>(null);
 
-  const { data: ensName } = useEnsName({
-    address: recoveredAddress as `0x${string}`,
-    chainId: sepolia.id,
-  });
+  const recoveredAddress = useMemo(() => {
+    if (contentData?.data && contentData?.signature) {
+      try {
+        return verifySignature(contentData.data, contentData.signature);
+      } catch (err) {
+        console.error('Signature verification failed:', err);
+        return null;
+      }
+    }
+    return null;
+  }, [contentData?.data, contentData?.signature]);
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -169,11 +175,33 @@ function PostCard({ post }: { post: Post }) {
   }, [post.hash]);
 
   useEffect(() => {
-    if (contentData?.data && contentData?.signature) {
-      const address = verifySignature(contentData.data, contentData.signature);
-      setRecoveredAddress(address);
-    }
-  }, [contentData]);
+    const fetchSubname = async () => {
+      if (!recoveredAddress) {
+        setSubname(null);
+        return;
+      }
+
+      try {
+        const response = await getNames({
+          domain: 'iwitness.eth',
+          address: recoveredAddress,
+          limit: 1,
+        });
+
+        if (response.success && response.data && response.data.length > 0) {
+          const nameData = response.data[0];
+          setSubname(`${nameData.name}.${nameData.domain}`);
+        } else {
+          setSubname(null);
+        }
+      } catch (err) {
+        console.error('Failed to fetch subname:', err);
+        setSubname(null);
+      }
+    };
+
+    fetchSubname();
+  }, [recoveredAddress]);
 
   const handleDownload = async () => {
     if (!contentData?.data?.baseImage) return;
@@ -319,7 +347,7 @@ function PostCard({ post }: { post: Post }) {
                     <Info className="w-4 h-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 bg-black/40 backdrop-blur-xl border-white/10 overflow-hidden flex flex-col shadow-2xl">
+                <DialogContent className="max-w-7xl max-h-[90vh] p-0 gap-0 bg-white/10 backdrop-blur-xl border-white/10 overflow-hidden flex flex-col shadow-2xl">
                   <DialogHeader className="p-6 border-b border-white/10 bg-white/5 backdrop-blur-xl sticky top-0 z-10">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-white/5 rounded-lg border border-white/10">
@@ -394,7 +422,7 @@ function PostCard({ post }: { post: Post }) {
           <div className="flex items-center gap-2 overflow-hidden">
             <FileText className="w-3 h-3 text-zinc-500 shrink-0" />
             <p className="text-xs text-black truncate font-medium ">
-              {ensName || post.originalName || 'Untitled'}
+              {subname || recoveredAddress || post.originalName || 'Untitled'}
             </p>
           </div>
           {post.size && (
@@ -416,14 +444,48 @@ function ContentDisplay({ data }: { data: ContentData }) {
   const timestamp = data.data?.timestamp;
   const signature = data.signature;
   const [isJsonOpen, setIsJsonOpen] = useState(false);
-  const [recoveredAddress, setRecoveredAddress] = useState<string | null>(null);
+  const [subname, setSubname] = useState<string | null>(null);
+
+  const recoveredAddress = useMemo(() => {
+    if (data.data && data.signature) {
+      try {
+        return verifySignature(data.data, data.signature);
+      } catch (err) {
+        console.error('Signature verification failed:', err);
+        return null;
+      }
+    }
+    return null;
+  }, [data.data, data.signature]);
 
   useEffect(() => {
-    if (data.data && data.signature) {
-      const address = verifySignature(data.data, data.signature);
-      setRecoveredAddress(address);
-    }
-  }, [data]);
+    const fetchSubname = async () => {
+      if (!recoveredAddress) {
+        setSubname(null);
+        return;
+      }
+
+      try {
+        const response = await getNames({
+          domain: 'iwitness.eth',
+          address: recoveredAddress,
+          limit: 1,
+        });
+
+        if (response.success && response.data && response.data.length > 0) {
+          const nameData = response.data[0];
+          setSubname(`${nameData.name}.${nameData.domain}`);
+        } else {
+          setSubname(null);
+        }
+      } catch (err) {
+        console.error('Failed to fetch subname:', err);
+        setSubname(null);
+      }
+    };
+
+    fetchSubname();
+  }, [recoveredAddress]);
 
   // Prepare chart data for depth statistics
   const depthStatsData = depthData ? [
@@ -615,7 +677,7 @@ function ContentDisplay({ data }: { data: ContentData }) {
             <div className="flex flex-col gap-1">
               <span className="text-xs text-zinc-500 uppercase tracking-wider">Signer</span>
               <p className="text-zinc-200 font-mono text-xs break-all">
-                {recoveredAddress || 'Verifying...'}
+                {subname || recoveredAddress || 'Verifying...'}
               </p>
             </div>
             <div className="flex flex-col gap-1 border-t border-white/10 pt-2">

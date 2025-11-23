@@ -24,7 +24,7 @@ export function Header() {
                         href="/register-device"
                         className="transition-colors font-bold hover:text-zinc-900/80 text-zinc-900"
                     >
-                        Register Device
+                        iWitness
                     </Link>
                 </nav>
 
