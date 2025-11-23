@@ -1,3 +1,5 @@
+"use client";
+
 import { VerificationForm } from "@/components/verification-form";
 import { RecentPirls } from "@/components/recent-pirls";
 import { Shield, Camera, Lock } from "lucide-react";
