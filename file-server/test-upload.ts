@@ -1,8 +1,4 @@
 import axios from 'axios';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import FormData from 'form-data';
 
 const API_URL = 'http://localhost:3000/api';
 
@@ -12,45 +8,53 @@ async function main() {
         const health = await axios.get(`${API_URL}/health`);
         console.log('✅ Health check passed:', health.data);
 
-        console.log('\n🔍 SETUP PAYMENT...');
-        try {
-            const payment = await axios.post(`${API_URL}/synapse/setup-payment`);
-            console.log('✅ Payment status:', payment.data);
-        } catch (e: any) {
-            console.log('⚠️ Could not setup payment (server might need funding):', e.message);
-        }
+        // console.log('\n🔍 SETUP PAYMENT...');
+        // try {
+        //     const payment = await axios.post(`${API_URL}/synapse/setup-payment`);
+        //     console.log('✅ Payment status:', payment.data);
+        // } catch (e: any) {
+        //     console.log('⚠️ Could not setup payment (server might need funding):', e.message);
+        // }
 
-        console.log('\n🔍 Checking payment status...');
-        try {
-            const payment = await axios.get(`${API_URL}/synapse/payment-status`);
-            console.log('✅ Payment status:', payment.data);
-        } catch (e: any) {
-            console.log('⚠️ Could not check payment status (server might need funding):', e.message);
-        }
+        // console.log('\n🔍 Checking payment status...');
+        // try {
+        //     const payment = await axios.get(`${API_URL}/synapse/payment-status`);
+        //     console.log('✅ Payment status:', payment.data);
+        // } catch (e: any) {
+        //     console.log('⚠️ Could not check payment status (server might need funding):', e.message);
+        // }
 
-        console.log('\n📤 Uploading image with signature...');
-        // Create a dummy image
-        const __dirname = path.dirname(fileURLToPath(import.meta.url));
-        const imagePath = path.join(__dirname, 'test-image.png');
-        // Create a simple 1x1 pixel PNG or just some random bytes pretending to be an image
-        // For a valid image test, let's write a small buffer
-        // Synapse requires > 127 bytes
-        const imageBuffer = Buffer.alloc(1024, 'a');
-        fs.writeFileSync(imagePath, imageBuffer);
+        console.log('\n📤 Uploading JSON metadata...');
 
-        const formData = new FormData();
-        formData.append('image', fs.createReadStream(imagePath));
-        formData.append('signature', '0x1234567890abcdef');
-        formData.append('metadata', JSON.stringify({ customKey: 'customValue' }));
+        // Create test metadata JSON with signature
+        const testMetadata = {
+            data: {
+                timestamp: Date.now(),
+                baseImage: 'test_base64_image_data',
+                depthImage: 'test_depth_base64_image_data',
+                depthData: {
+                    shape: [480, 640],
+                    dtype: 'float32',
+                    min: 0.0,
+                    max: 100.0,
+                    mean: 50.0,
+                    valid_pixels: 1000
+                }
+            },
+            signature: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+        };
 
-        const uploadRes = await axios.post(`${API_URL}/upload`, formData, {
+        const uploadRes = await axios.post(`${API_URL}/upload`, testMetadata, {
             headers: {
-                ...formData.getHeaders(),
+                'Content-Type': 'application/json',
             },
         });
 
-        console.log('✅ Upload successful:', uploadRes.data);
+        console.log('✅ Upload successful:', JSON.stringify(uploadRes.data, null, 2));
         const pieceCid = uploadRes.data.data.pieceCid;
+
+        console.log('uploadRes:', JSON.stringify(uploadRes, null, 2));
+        console.log('PieceCID:', pieceCid);
 
         if (pieceCid) {
             console.log(`\n📥 Downloading file ${pieceCid}...`);
@@ -62,15 +66,25 @@ async function main() {
 
             // Verify content
             const downloadedBuffer = Buffer.from(downloadRes.data);
-            if (downloadedBuffer.equals(imageBuffer)) {
-                console.log('✅ Content matches original image!');
-            } else {
-                console.error('❌ Content mismatch!');
+            const originalJsonString = JSON.stringify(testMetadata);
+            const downloadedJsonString = downloadedBuffer.toString('utf-8');
+
+            try {
+                const downloadedJson = JSON.parse(downloadedJsonString);
+                const originalJson = JSON.parse(originalJsonString);
+
+                // Compare JSON objects (order-independent)
+                if (JSON.stringify(downloadedJson) === JSON.stringify(originalJson)) {
+                    console.log('✅ Content matches original JSON!');
+                } else {
+                    console.error('❌ Content mismatch!');
+                    console.log('Original:', originalJsonString.substring(0, 100));
+                    console.log('Downloaded:', downloadedJsonString.substring(0, 100));
+                }
+            } catch (e) {
+                console.error('❌ Failed to parse downloaded JSON:', e);
             }
         }
-
-        // Cleanup
-        fs.unlinkSync(imagePath);
 
     } catch (error: any) {
         console.error('❌ Test failed:', error.message);

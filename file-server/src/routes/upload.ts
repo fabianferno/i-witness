@@ -1,63 +1,58 @@
 import { Router, Request, Response } from 'express';
-import multer from 'multer';
 import { uploadToStorage, downloadFromStorage } from '../services/synapse.js';
 import { savePostHash } from '../services/mongodb.js';
 
 const router = Router();
 
-// Configure multer for file uploads (memory storage)
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    // Accept image files
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed'));
-    }
-  },
-});
-
 /**
  * POST /api/upload
- * Upload an image file with signature metadata
+ * Upload JSON metadata
  * 
- * Body (multipart/form-data):
- * - image: Image file
- * - signature: Signature string (metadata)
+ * Body (application/json):
+ * - JSON object containing metadata (including signature field)
  */
-router.post('/', (upload.single('image') as any), async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
   try {
-    if (!req.file) {
+    // Get JSON body directly
+    const jsonContent = req.body;
+
+    if (!jsonContent || typeof jsonContent !== 'object') {
       return res.status(400).json({
         status: 'error',
-        message: 'No image file provided',
+        message: 'Invalid JSON body provided',
       });
     }
 
-    const signature = req.body.signature || '';
-    const additionalMetadata = req.body.metadata
-      ? JSON.parse(req.body.metadata)
-      : {};
+    // Extract signature from JSON (if present)
+    const signature = jsonContent.signature || '';
 
-    // Prepare metadata object
-    const metadata: Record<string, string> = {
-      originalName: req.file.originalname,
-      mimeType: req.file.mimetype,
+    // Prepare metadata object from the JSON content
+    // Include all top-level fields from the JSON as metadata
+    const metadata: Record<string, any> = {
       uploadedAt: new Date().toISOString(),
-      ...additionalMetadata,
     };
 
-    // Add signature to metadata
+    // Add signature to metadata if present
     if (signature) {
       metadata.signature = signature;
     }
 
-    // Convert file buffer to Uint8Array
-    const fileData = new Uint8Array(req.file.buffer);
+    // Include other metadata fields from the JSON (excluding signature which is already added)
+    // Store the full JSON structure for reference
+    if (jsonContent.data) {
+      metadata.data = jsonContent.data;
+    }
+
+    // Add any other top-level fields from the JSON
+    Object.keys(jsonContent).forEach(key => {
+      if (key !== 'signature' && key !== 'data') {
+        metadata[key] = jsonContent[key];
+      }
+    });
+
+    // Convert JSON to string and then to Uint8Array for storage
+    const jsonString = JSON.stringify(jsonContent);
+    const fileData = new Uint8Array(Buffer.from(jsonString, 'utf-8'));
 
     // Upload to Filecoin storage
     const result = await uploadToStorage(fileData, metadata);
@@ -93,7 +88,7 @@ router.post('/', (upload.single('image') as any), async (req: Request, res: Resp
 
 /**
  * GET /api/upload/:pieceCid
- * Download an image file by PieceCID
+ * Download a JSON metadata file by PieceCID
  */
 router.get('/:pieceCid', async (req: Request, res: Response) => {
   try {
@@ -109,9 +104,9 @@ router.get('/:pieceCid', async (req: Request, res: Response) => {
     // Download from Filecoin storage
     const data = await downloadFromStorage(pieceCid);
 
-    // Set appropriate headers
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${pieceCid}"`);
+    // Set appropriate headers for JSON file
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${pieceCid}.json"`);
     res.setHeader('Content-Length', data.length.toString());
 
     // Send the file data
