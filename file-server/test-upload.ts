@@ -16,13 +16,13 @@ async function main() {
         //     console.log('⚠️ Could not setup payment (server might need funding):', e.message);
         // }
 
-        // console.log('\n🔍 Checking payment status...');
-        // try {
-        //     const payment = await axios.get(`${API_URL}/synapse/payment-status`);
-        //     console.log('✅ Payment status:', payment.data);
-        // } catch (e: any) {
-        //     console.log('⚠️ Could not check payment status (server might need funding):', e.message);
-        // }
+        console.log('\n🔍 Checking payment status...');
+        try {
+            const payment = await axios.get(`${API_URL}/synapse/payment-status`);
+            console.log('✅ Payment status:', payment.data);
+        } catch (e: any) {
+            console.log('⚠️ Could not check payment status (server might need funding):', e.message);
+        }
 
         console.log('\n📤 Uploading JSON metadata...');
 
@@ -51,39 +51,46 @@ async function main() {
         });
 
         console.log('✅ Upload successful:', JSON.stringify(uploadRes.data, null, 2));
-        const pieceCid = uploadRes.data.data.pieceCid;
 
-        console.log('uploadRes:', JSON.stringify(uploadRes, null, 2));
-        console.log('PieceCID:', pieceCid);
+        // Extract pieceCid - handle both object and string formats
+        let pieceCid = uploadRes.data.data.pieceCid;
+        if (pieceCid && typeof pieceCid === 'object' && '/' in pieceCid) {
+            pieceCid = pieceCid['/'];
+        }
 
-        if (pieceCid) {
-            console.log(`\n📥 Downloading file ${pieceCid}...`);
-            const downloadRes = await axios.get(`${API_URL}/upload/${pieceCid}`, {
-                responseType: 'arraybuffer',
-            });
+        if (!pieceCid) {
+            console.error('❌ No PieceCID returned in response');
+            process.exit(1);
+        }
 
-            console.log('✅ Download successful, size:', downloadRes.data.length);
+        console.log('📋 PieceCID:', pieceCid);
 
-            // Verify content
-            const downloadedBuffer = Buffer.from(downloadRes.data);
-            const originalJsonString = JSON.stringify(testMetadata);
-            const downloadedJsonString = downloadedBuffer.toString('utf-8');
+        console.log(`\n📥 Downloading file ${pieceCid}...`);
+        const downloadRes = await axios.get(`${API_URL}/upload/${pieceCid}`, {
+            responseType: 'arraybuffer',
+        });
 
-            try {
-                const downloadedJson = JSON.parse(downloadedJsonString);
-                const originalJson = JSON.parse(originalJsonString);
+        console.log('✅ Download successful, size:', downloadRes.data.length);
 
-                // Compare JSON objects (order-independent)
-                if (JSON.stringify(downloadedJson) === JSON.stringify(originalJson)) {
-                    console.log('✅ Content matches original JSON!');
-                } else {
-                    console.error('❌ Content mismatch!');
-                    console.log('Original:', originalJsonString.substring(0, 100));
-                    console.log('Downloaded:', downloadedJsonString.substring(0, 100));
-                }
-            } catch (e) {
-                console.error('❌ Failed to parse downloaded JSON:', e);
+        // Verify content
+        const downloadedBuffer = Buffer.from(downloadRes.data);
+        const originalJsonString = JSON.stringify(testMetadata);
+        const downloadedJsonString = downloadedBuffer.toString('utf-8');
+
+        try {
+            const downloadedJson = JSON.parse(downloadedJsonString);
+            const originalJson = JSON.parse(originalJsonString);
+
+            // Compare JSON objects (order-independent)
+            if (JSON.stringify(downloadedJson) === JSON.stringify(originalJson)) {
+                console.log('✅ Content matches original JSON!');
+            } else {
+                console.error('❌ Content mismatch!');
+                console.log('Original:', originalJsonString.substring(0, 100));
+                console.log('Downloaded:', downloadedJsonString.substring(0, 100));
             }
+        } catch (e) {
+            console.error('❌ Failed to parse downloaded JSON:', e);
         }
 
     } catch (error: any) {

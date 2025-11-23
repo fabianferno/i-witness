@@ -57,6 +57,8 @@ router.post('/', async (req: Request, res: Response) => {
     // Upload to Filecoin storage
     const result = await uploadToStorage(fileData, metadata);
 
+    console.log('result:', JSON.stringify(result, null, 2));
+
     // Save hash to MongoDB after successful upload
     try {
       await savePostHash(result.pieceCid, {
