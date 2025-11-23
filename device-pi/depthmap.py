@@ -4,6 +4,14 @@ import os
 from collections import deque
 import time
 import json
+import base64
+import requests
+from eth_account import Account
+from eth_account.messages import encode_defunct
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 
 LEFT_PATH = "/dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0"
@@ -11,7 +19,7 @@ RIGHT_PATH = "/dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2
 PARAM_FILE = 'stereo_params.npz'
 WIDTH = 640
 HEIGHT = 480
-FPS = 30
+FPS = 15
 
 def compute_stereo_depth(imgL, imgR, stereo):
     """Compute depth map using SGBM"""
@@ -55,13 +63,63 @@ def fake_depth_effect(frame):
     overlay = cv2.addWeighted(frame, 0.4, fake_depth, 0.6, 0)
     return overlay
 
+def image_to_base64(image):
+    """Convert OpenCV image to base64 string"""
+    _, buffer = cv2.imencode('.jpg', image)
+    return base64.b64encode(buffer).decode('utf-8')
+
+def compress_depth_data(disparity):
+    """Compress depth data for JSON storage"""
+    valid_mask = disparity > 0
+    
+    depth_data = {
+        'shape': list(disparity.shape),
+        'dtype': str(disparity.dtype),
+        'min': float(np.min(disparity)),
+        'max': float(np.max(disparity)),
+        'mean': float(np.mean(disparity)),
+        'valid_pixels': int(np.sum(valid_mask))
+    }
+    
+    # Store only non-zero values with their indices for efficiency
+    if valid_mask.any():
+        indices = np.where(valid_mask)
+        values = disparity[valid_mask]
+        
+        # Convert to lists for JSON serialization
+        depth_data['indices_y'] = indices[0].tolist()
+        depth_data['indices_x'] = indices[1].tolist()
+        depth_data['values'] = values.tolist()
+    else:
+        depth_data['indices_y'] = []
+        depth_data['indices_x'] = []
+        depth_data['values'] = []
+    
+    return depth_data
+
+def sign_data_eip191(data_dict, private_key):
+    """Sign data using EIP-191 signature"""
+    # Convert data to deterministic JSON string
+    data_str = json.dumps(data_dict, sort_keys=True, separators=(',', ':'))
+    
+    # Create Ethereum account from private key
+    account = Account.from_key(private_key)
+    
+    # Encode message with EIP-191
+    message = encode_defunct(text=data_str)
+    
+    # Sign
+    signed_message = account.sign_message(message)
+    
+    return signed_message.signature.hex()
+
 def save_depth_data(disparity, timestamp):
     """Save depth map data in compressed format"""
     
     # Create output dictionary
     depth_data = {
         'timestamp': timestamp,
-        'shape': disparity.shape,
+        'shape': list(disparity.shape),
         'dtype': str(disparity.dtype),
         'min': float(np.min(disparity)),
         'max': float(np.max(disparity)),
@@ -99,6 +157,160 @@ def save_depth_data(disparity, timestamp):
     print("="*70 + "\n")
     
     return depth_file, json_file
+
+def show_popup_message(display_frame, message, duration=3, color=(0, 255, 0)):
+    """Display a popup message on the OpenCV window"""
+    overlay = display_frame.copy()
+    
+    # Create semi-transparent overlay
+    cv2.rectangle(overlay, (0, 0), (overlay.shape[1], overlay.shape[0]), (0, 0, 0), -1)
+    overlay = cv2.addWeighted(overlay, 0.7, display_frame, 0.3, 0)
+    
+    # Calculate text size and position (centered)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.7
+    thickness = 2
+    
+    # Split message into lines and handle long CID strings
+    lines = message.split('\n')
+    # Break long lines (like CID) into multiple lines if needed
+    max_chars_per_line = 50
+    processed_lines = []
+    for line in lines:
+        if len(line) > max_chars_per_line:
+            # Break long line into chunks
+            for i in range(0, len(line), max_chars_per_line):
+                processed_lines.append(line[i:i+max_chars_per_line])
+        else:
+            processed_lines.append(line)
+    
+    text_height = 35
+    total_height = len(processed_lines) * text_height
+    start_y = (overlay.shape[0] - total_height) // 2
+    
+    # Draw each line
+    for i, line in enumerate(processed_lines):
+        text_size = cv2.getTextSize(line, font, font_scale, thickness)[0]
+        text_x = (overlay.shape[1] - text_size[0]) // 2
+        text_y = start_y + (i + 1) * text_height
+        
+        # Draw text with shadow for better visibility
+        cv2.putText(overlay, line, (text_x + 2, text_y + 2), font, font_scale, (0, 0, 0), thickness + 1)
+        cv2.putText(overlay, line, (text_x, text_y), font, font_scale, color, thickness)
+    
+    cv2.imshow('Stereo Depth System - 5 View', overlay)
+    cv2.waitKey(int(duration * 1000))
+
+def create_signed_payload(imgL, other_views, disparity, timestamp):
+    """Create signed payload using existing logic"""
+    private_key = os.getenv('PRIVATE_KEY')
+    
+    if not private_key:
+        print("⚠ WARNING: PRIVATE_KEY not found in environment!")
+        print("  Capture will not be signed.")
+        signature = "UNSIGNED_NO_PRIVATE_KEY"
+    else:
+        if not private_key.startswith('0x'):
+            private_key = '0x' + private_key
+    
+    # Convert images to base64
+    print("Encoding images to base64...")
+    base_image_b64 = image_to_base64(imgL)
+    depth_image_b64 = image_to_base64(other_views)
+    
+    # Compress depth data
+    print("Compressing depth data...")
+    depth_data = compress_depth_data(disparity)
+    
+    # Create data object
+    data_obj = {
+        'timestamp': timestamp,
+        'baseImage': base_image_b64,
+        'depthImage': depth_image_b64,
+        'depthData': depth_data
+    }
+    
+    # Sign the data
+    if private_key:
+        print("Signing data with EIP-191...")
+        try:
+            signature = sign_data_eip191(data_obj, private_key)
+            signer_address = Account.from_key(private_key).address
+            print(f"✓ Signed by: {signer_address}")
+            print(f"✓ Signature: {signature[:20]}...{signature[-20:]}")
+        except Exception as e:
+            print(f"⚠ Signature failed: {e}")
+            import traceback
+            traceback.print_exc()
+            signature = f"SIGNATURE_ERROR_{e}"
+    else:
+        signature = "UNSIGNED_NO_PRIVATE_KEY"
+    
+    # Create final JSON structure
+    payload = {
+        'data': data_obj,
+        'signature': signature
+    }
+    
+    return payload
+
+def print_payload_summary(payload):
+    """Print payload summary excluding huge depthData"""
+    print("\n" + "="*70)
+    print("PAYLOAD SUMMARY (before upload)")
+    print("="*70)
+    print(f"Signature: {payload.get('signature', 'N/A')}")
+    if 'data' in payload:
+        data = payload['data']
+        print(f"Timestamp: {data.get('timestamp', 'N/A')}")
+        print(f"Base Image: {len(data.get('baseImage', ''))} chars (base64)")
+        print(f"Depth Image: {len(data.get('depthImage', ''))} chars (base64)")
+        if 'depthData' in data:
+            depth_data = data['depthData']
+            print(f"Depth Data:")
+            print(f"  - Shape: {depth_data.get('shape', 'N/A')}")
+            print(f"  - Dtype: {depth_data.get('dtype', 'N/A')}")
+            print(f"  - Min: {depth_data.get('min', 'N/A')}")
+            print(f"  - Max: {depth_data.get('max', 'N/A')}")
+            print(f"  - Mean: {depth_data.get('mean', 'N/A')}")
+            print(f"  - Valid Pixels: {depth_data.get('valid_pixels', 'N/A')}")
+            print(f"  - Values Count: {len(depth_data.get('values', []))}")
+            print(f"  - (Full depthData object excluded from print - too large)")
+    print("="*70 + "\n")
+
+def upload_to_server(payload, server_url):
+    """Upload witness data to the server"""
+    try:
+        # Print payload summary before sending
+        print_payload_summary(payload)
+        
+        # Post to server
+        upload_url = f"{server_url}/api/upload"
+        print(f"📤 Uploading to: {upload_url}")
+        response = requests.post(upload_url, json=payload, headers={'Content-Type': 'application/json'}, timeout=150)
+        
+        if response.status_code == 200:
+            result = response.json()
+            # Extract pieceCid - handle both object and string formats
+            piece_cid_raw = result.get('data', {}).get('pieceCid', 'N/A')
+            if piece_cid_raw and isinstance(piece_cid_raw, dict) and '/' in piece_cid_raw:
+                piece_cid = piece_cid_raw['/']
+            elif piece_cid_raw:
+                piece_cid = str(piece_cid_raw)
+            else:
+                piece_cid = 'N/A'
+            print(f"✅ Upload successful! PieceCID: {piece_cid}")
+            return True, result, piece_cid
+        else:
+            print(f"❌ Upload failed with status {response.status_code}: {response.text}")
+            return False, None, None
+            
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Network error during upload: {e}")
+        return False, None, None
+    except Exception as e:
+        print(f"❌ Error during upload: {e}")
+        return False, None, None
 
 def run_five_view():
     """Run stereo depth with 5-view output"""
@@ -281,6 +493,29 @@ def run_five_view():
             
             # Save depth data
             depth_file, json_file = save_depth_data(disparity, timestamp)
+            
+            # Show popup message
+            server_url = os.getenv('SERVER_URL', 'http://localhost:3000')
+            popup_message = "Witness image captured,\nsigning and sending it to\nFilecoinOnchain Cloud"
+            show_popup_message(five_view, popup_message, duration=3)
+            
+            # Create signed payload using existing logic
+            print(f"\n📤 Creating signed payload and uploading to server: {server_url}")
+            payload = create_signed_payload(imgL, other_views, disparity, timestamp)
+            
+            # Upload to server
+            success, result, piece_cid = upload_to_server(payload, server_url)
+            
+            if success and piece_cid:
+                # Display success message with CID
+                success_message = f"✅ Upload Successful!\n\nPieceCID:\n{piece_cid}"
+                show_popup_message(five_view, success_message, duration=5, color=(0, 255, 0))
+                print(f"✅ Upload complete!\n")
+            else:
+                # Display error message
+                error_message = "❌ Upload Failed\n\nCheck console for details"
+                show_popup_message(five_view, error_message, duration=3, color=(0, 0, 255))
+                print(f"⚠️ Upload failed, but files saved locally.\n")
             
             capture_count += 1
             print(f"✓ Capture #{capture_count} complete!\n")
