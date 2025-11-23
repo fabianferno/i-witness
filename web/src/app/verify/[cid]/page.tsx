@@ -1,3 +1,5 @@
+"use client";
+
 import { VerificationResults } from "@/components/verification-results";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";

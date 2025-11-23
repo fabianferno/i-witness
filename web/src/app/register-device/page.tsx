@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAddSubname, useIsSubnameAvailable } from "@justaname.id/react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,10 +9,19 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, CheckCircle2, AlertCircle, Copy, RefreshCw } from "lucide-react";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { toast } from "sonner";
+import { setNameSubname, checkSubnameAvailability, getNames, NameData } from "@/lib/namestone";
+import { Badge } from "@/components/ui/badge";
+
+const primaryDomain = "iwitness.eth";
 
 function RegisterDeviceForm() {
     const [label, setLabel] = useState("");
     const [debouncedLabel, setDebouncedLabel] = useState("");
+    const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+    const [isSubnameAvailable, setIsSubnameAvailable] = useState<boolean | undefined>(undefined);
+    const [isRegistering, setIsRegistering] = useState(false);
+    const [existingSubnames, setExistingSubnames] = useState<NameData[]>([]);
+    const [isLoadingSubnames, setIsLoadingSubnames] = useState(false);
 
     // Proper debounce implementation using useEffect
     useEffect(() => {
@@ -27,13 +34,47 @@ function RegisterDeviceForm() {
         };
     }, [label]);
 
-    // Hooks can be called here because this component only renders after mount
-    const subnameCheck = useIsSubnameAvailable({
-        username: debouncedLabel || '',
-    });
-    const isSubnameAvailable = debouncedLabel ? subnameCheck.isSubnameAvailable : undefined;
+    // Fetch existing subnames on mount
+    useEffect(() => {
+        const fetchSubnames = async () => {
+            setIsLoadingSubnames(true);
+            try {
+                const response = await getNames({ domain: primaryDomain });
+                if (response.success && response.data) {
+                    setExistingSubnames(response.data);
+                }
+            } catch (error) {
+                console.error('Error fetching subnames:', error);
+            } finally {
+                setIsLoadingSubnames(false);
+            }
+        };
 
-    const { addSubname } = useAddSubname();
+        fetchSubnames();
+    }, []);
+
+    // Check availability when debounced label changes
+    useEffect(() => {
+        const checkAvailability = async () => {
+            if (!debouncedLabel || debouncedLabel.length === 0) {
+                setIsSubnameAvailable(undefined);
+                return;
+            }
+
+            setIsCheckingAvailability(true);
+            try {
+                const available = await checkSubnameAvailability(debouncedLabel, primaryDomain);
+                setIsSubnameAvailable(available);
+            } catch (error) {
+                console.error('Availability check error:', error);
+                setIsSubnameAvailable(false);
+            } finally {
+                setIsCheckingAvailability(false);
+            }
+        };
+
+        checkAvailability();
+    }, [debouncedLabel]);
 
     const [generatedKey, setGeneratedKey] = useState<{ privateKey: string; address: string } | null>(null);
     const [registrationSuccess, setRegistrationSuccess] = useState<{ fullDomain: string } | null>(null);
@@ -58,18 +99,31 @@ function RegisterDeviceForm() {
     const handleRegister = async () => {
         if (!generatedKey || !label) return;
 
+        setIsRegistering(true);
+        setError(null);
+
         try {
-            setError(null);
-            await addSubname({
-                username: label,
-                addresses: { '60': generatedKey.address },
-            });
-            setRegistrationSuccess({ fullDomain: `${label}.iwitness.eth` });
+            await setNameSubname(
+                label,
+                generatedKey.address,
+                primaryDomain
+            );
+
+            setRegistrationSuccess({ fullDomain: `${label}.${primaryDomain}` });
             toast.success("Device registered successfully!");
-        } catch (err: any) {
+
+            // Refresh the subnames list
+            const response = await getNames({ domain: primaryDomain });
+            if (response.success && response.data) {
+                setExistingSubnames(response.data);
+            }
+        } catch (err) {
             console.error(err);
-            setError(err.message || "Failed to register subname");
+            const errorMessage = err instanceof Error ? err.message : "Failed to register subname";
+            setError(errorMessage);
             toast.error("Failed to register device");
+        } finally {
+            setIsRegistering(false);
         }
     };
 
@@ -148,19 +202,52 @@ function RegisterDeviceForm() {
                                 placeholder="e.g. camera-01"
                                 disabled={!generatedKey || !!registrationSuccess}
                             />
-                            <span className="text-sm text-zinc-900">.iwitness.eth</span>
+                            <span className="text-sm text-zinc-900">.{primaryDomain}</span>
                         </div>
                         {debouncedLabel && (
                             <div className="text-xs h-4">
-                                {isSubnameAvailable ? (
+                                {isCheckingAvailability ? (
+                                    <span className="text-zinc-500 flex items-center">
+                                        <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Checking availability...
+                                    </span>
+                                ) : isSubnameAvailable === true ? (
                                     <span className="text-green-600 flex items-center">
                                         <CheckCircle2 className="h-3 w-3 mr-1" /> Available
                                     </span>
-                                ) : (
+                                ) : isSubnameAvailable === false ? (
                                     <span className="text-red-500 flex items-center">
-                                        <AlertCircle className="h-3 w-3 mr-1" /> Unavailable
+                                        <AlertCircle className="h-3 w-3 mr-1" /> Unavailable or invalid
                                     </span>
-                                )}
+                                ) : null}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Existing Subnames */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label>Existing Subnames ({existingSubnames.length})</Label>
+                            {isLoadingSubnames && (
+                                <Loader2 className="h-3 w-3 animate-spin text-zinc-500" />
+                            )}
+                        </div>
+                        {existingSubnames.length > 0 ? (
+                            <div className="rounded-md bg-zinc-100 p-3 dark:bg-zinc-800 max-h-48 overflow-y-auto">
+                                <div className="flex flex-wrap gap-2">
+                                    {existingSubnames.map((subname, index) => (
+                                        <Badge
+                                            key={index}
+                                            variant="secondary"
+                                            className="text-xs font-mono"
+                                        >
+                                            {subname.name}.{primaryDomain}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="rounded-md bg-zinc-100 p-3 text-sm text-zinc-500 dark:bg-zinc-800">
+                                {isLoadingSubnames ? 'Loading...' : 'No subnames registered yet'}
                             </div>
                         )}
                     </div>
@@ -186,9 +273,16 @@ function RegisterDeviceForm() {
                     <Button
                         onClick={handleRegister}
                         className="w-full"
-                        disabled={!generatedKey || !label || !isSubnameAvailable || !!registrationSuccess}
+                        disabled={!generatedKey || !label || isSubnameAvailable !== true || !!registrationSuccess || isRegistering}
                     >
-                        Register Device
+                        {isRegistering ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Registering...
+                            </>
+                        ) : (
+                            'Register Device'
+                        )}
                     </Button>
                 </CardContent>
             </Card>
@@ -200,7 +294,10 @@ function RegisterDeviceContent() {
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        setMounted(true);
+        // Use requestAnimationFrame to avoid synchronous setState in effect
+        requestAnimationFrame(() => {
+            setMounted(true);
+        });
     }, []);
 
     if (!mounted) {
