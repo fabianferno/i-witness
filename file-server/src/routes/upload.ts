@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { uploadToStorage, downloadFromStorage } from '../services/synapse.js';
+import { savePostHash } from '../services/mongodb.js';
 
 const router = Router();
 
@@ -60,6 +61,18 @@ router.post('/', (upload.single('image') as any), async (req: Request, res: Resp
 
     // Upload to Filecoin storage
     const result = await uploadToStorage(fileData, metadata);
+
+    // Save hash to MongoDB after successful upload
+    try {
+      await savePostHash(result.pieceCid, {
+        size: result.size,
+        ...metadata,
+      });
+    } catch (mongoError: any) {
+      // Log MongoDB error but don't fail the upload response
+      // The file was successfully uploaded to Filecoin
+      console.error('Failed to save hash to MongoDB:', mongoError);
+    }
 
     res.status(200).json({
       status: 'success',
