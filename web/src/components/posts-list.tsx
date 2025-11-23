@@ -367,12 +367,12 @@ function PostCard({ post }: { post: Post }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 overflow-hidden">
             <FileText className="w-3 h-3 text-zinc-500 shrink-0" />
-            <p className="text-xs text-zinc-300 truncate font-medium">
+            <p className="text-xs text-black truncate font-medium ">
               {ensName || post.originalName || 'Untitled'}
             </p>
           </div>
           {post.size && (
-            <span className="text-[10px] text-zinc-500 font-mono shrink-0">
+            <span className="text-[10px] text-black font-mono shrink-0">
               {formatFileSize(post.size)}
             </span>
           )}
