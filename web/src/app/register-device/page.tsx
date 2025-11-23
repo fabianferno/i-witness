@@ -6,13 +6,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, CheckCircle2, AlertCircle, Copy, RefreshCw } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Copy, RefreshCw, Trash2 } from "lucide-react";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { toast } from "sonner";
-import { setNameSubname, checkSubnameAvailability, getNames, NameData } from "@/lib/namestone";
+import { setNameSubname, checkSubnameAvailability, getNames, deleteSubname, NameData } from "@/lib/namestone";
 import { Badge } from "@/components/ui/badge";
 
 const primaryDomain = "iwitness.eth";
+
+// Helper function to truncate address: 0x1234...5678
+function truncateAddress(address: string, startLength: number = 6, endLength: number = 4): string {
+    if (!address || address.length <= startLength + endLength) {
+        return address;
+    }
+    return `${address.slice(0, startLength)}...${address.slice(-endLength)}`;
+}
 
 function RegisterDeviceForm() {
     const [label, setLabel] = useState("");
@@ -22,6 +30,7 @@ function RegisterDeviceForm() {
     const [isRegistering, setIsRegistering] = useState(false);
     const [existingSubnames, setExistingSubnames] = useState<NameData[]>([]);
     const [isLoadingSubnames, setIsLoadingSubnames] = useState(false);
+    const [deletingSubname, setDeletingSubname] = useState<string | null>(null);
 
     // Proper debounce implementation using useEffect
     useEffect(() => {
@@ -96,6 +105,13 @@ function RegisterDeviceForm() {
         toast.success(`${description} copied to clipboard`);
     };
 
+    const refreshSubnames = async () => {
+        const response = await getNames({ domain: primaryDomain });
+        if (response.success && response.data) {
+            setExistingSubnames(response.data);
+        }
+    };
+
     const handleRegister = async () => {
         if (!generatedKey || !label) return;
 
@@ -113,10 +129,7 @@ function RegisterDeviceForm() {
             toast.success("Device registered successfully!");
 
             // Refresh the subnames list
-            const response = await getNames({ domain: primaryDomain });
-            if (response.success && response.data) {
-                setExistingSubnames(response.data);
-            }
+            await refreshSubnames();
         } catch (err) {
             console.error(err);
             const errorMessage = err instanceof Error ? err.message : "Failed to register subname";
@@ -124,6 +137,26 @@ function RegisterDeviceForm() {
             toast.error("Failed to register device");
         } finally {
             setIsRegistering(false);
+        }
+    };
+
+    const handleDelete = async (name: string) => {
+        if (!confirm(`Are you sure you want to delete ${name}.${primaryDomain}? This action cannot be undone.`)) {
+            return;
+        }
+
+        setDeletingSubname(name);
+        try {
+            await deleteSubname(name, primaryDomain);
+            toast.success(`Subname ${name}.${primaryDomain} deleted successfully!`);
+            // Refresh the subnames list
+            await refreshSubnames();
+        } catch (err) {
+            console.error(err);
+            const errorMessage = err instanceof Error ? err.message : "Failed to delete subname";
+            toast.error(errorMessage);
+        } finally {
+            setDeletingSubname(null);
         }
     };
 
@@ -233,15 +266,49 @@ function RegisterDeviceForm() {
                         </div>
                         {existingSubnames.length > 0 ? (
                             <div className="rounded-md bg-black/10 p-3 dark:bg-zinc-800 max-h-48 overflow-y-auto">
-                                <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-col gap-2">
                                     {existingSubnames.map((subname, index) => (
-                                        <Badge
+                                        <div
                                             key={index}
-                                            variant="secondary"
-                                            className="text-xs font-mono"
+                                            className="flex items-center justify-between p-2 rounded bg-white/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700"
                                         >
-                                            {subname.name}.{primaryDomain}
-                                        </Badge>
+                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="text-xs font-mono"
+                                                >
+                                                    {subname.name}.{primaryDomain}
+                                                </Badge>
+                                                {subname.address && (
+                                                    <button
+                                                        type="button"
+                                                        className="text-xs cursor-pointer text-zinc-600 dark:text-zinc-400 font-mono flex items-center hover:bg-zinc-200 dark:hover:bg-zinc-800 px-1 py-0.5 rounded transition"
+                                                        title="Copy address"
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(subname.address);
+                                                            toast.success("Copied to clipboard!");
+                                                        }}
+                                                    >
+                                                        {truncateAddress(subname.address)}
+                                                        <Copy className="h-3 w-3 ml-1 text-zinc-500" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 cursor-pointer text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                onClick={() => handleDelete(subname.name)}
+                                                disabled={deletingSubname === subname.name}
+                                                title={`Delete ${subname.name}.${primaryDomain}`}
+                                            >
+                                                {deletingSubname === subname.name ? (
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="h-3 w-3" />
+                                                )}
+                                            </Button>
+                                        </div>
                                     ))}
                                 </div>
                             </div>

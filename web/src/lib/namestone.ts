@@ -156,3 +156,45 @@ export async function checkSubnameAvailability(
     return true;
 }
 
+export interface DeleteNameResponse {
+    success: boolean;
+    message?: string;
+    data?: unknown;
+}
+
+/**
+ * Delete a subname using Namestone API via Next.js API route
+ */
+export async function deleteSubname(
+    name: string,
+    domain: string = 'iwitness.eth'
+): Promise<DeleteNameResponse> {
+    try {
+        const response = await fetch('/api/namestone/delete-name', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                domain,
+                name,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || data.error || `API error: ${response.statusText}`);
+        }
+
+        return {
+            success: true,
+            data: data.data,
+        };
+    } catch (error) {
+        console.error('Namestone deleteName error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to delete subname';
+        throw new Error(errorMessage);
+    }
+}
+
