@@ -2,6 +2,7 @@
 
 import { VerificationForm } from "@/components/verification-form";
 import { RecentPirls } from "@/components/recent-pirls";
+import { PostsList } from "@/components/posts-list";
 import { Shield, Camera, Lock } from "lucide-react";
 
 export default function Home() {
@@ -32,6 +33,8 @@ export default function Home() {
         <VerificationForm />
 
         <RecentPirls />
+
+        <PostsList />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full mt-12">
           <FeatureCard
