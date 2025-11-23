@@ -4,6 +4,8 @@ import os
 from collections import deque
 import time
 import json
+import base64
+import requests
 
 
 LEFT_PATH = "/dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0"
@@ -61,7 +63,7 @@ def save_depth_data(disparity, timestamp):
     # Create output dictionary
     depth_data = {
         'timestamp': timestamp,
-        'shape': disparity.shape,
+        'shape': list(disparity.shape),
         'dtype': str(disparity.dtype),
         'min': float(np.min(disparity)),
         'max': float(np.max(disparity)),
@@ -98,7 +100,88 @@ def save_depth_data(disparity, timestamp):
     print(f"  disparity = data['disparity']")
     print("="*70 + "\n")
     
-    return depth_file, json_file
+    return depth_file, json_file, depth_data
+
+def show_popup_message(display_frame, message, duration=3):
+    """Display a popup message on the OpenCV window"""
+    overlay = display_frame.copy()
+    
+    # Create semi-transparent overlay
+    cv2.rectangle(overlay, (0, 0), (overlay.shape[1], overlay.shape[0]), (0, 0, 0), -1)
+    overlay = cv2.addWeighted(overlay, 0.7, display_frame, 0.3, 0)
+    
+    # Calculate text size and position (centered)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.8
+    thickness = 2
+    
+    # Split message into lines if needed
+    lines = message.split('\n')
+    text_height = 40
+    total_height = len(lines) * text_height
+    start_y = (overlay.shape[0] - total_height) // 2
+    
+    # Draw each line
+    for i, line in enumerate(lines):
+        text_size = cv2.getTextSize(line, font, font_scale, thickness)[0]
+        text_x = (overlay.shape[1] - text_size[0]) // 2
+        text_y = start_y + (i + 1) * text_height
+        
+        # Draw text with shadow for better visibility
+        cv2.putText(overlay, line, (text_x + 2, text_y + 2), font, font_scale, (0, 0, 0), thickness + 1)
+        cv2.putText(overlay, line, (text_x, text_y), font, font_scale, (0, 255, 0), thickness)
+    
+    cv2.imshow('Stereo Depth System - 5 View', overlay)
+    cv2.waitKey(int(duration * 1000))
+
+def upload_to_server(left_image_path, depth_data_dict, depth_color_image, server_url):
+    """Upload witness data to the server"""
+    try:
+        # Read and encode left image to base64
+        with open(left_image_path, 'rb') as f:
+            left_image_bytes = f.read()
+            base_image_b64 = base64.b64encode(left_image_bytes).decode('utf-8')
+        
+        # Encode depth visualization image to base64
+        _, depth_buffer = cv2.imencode('.jpg', depth_color_image)
+        depth_image_b64 = base64.b64encode(depth_buffer).decode('utf-8')
+        
+        # Create payload similar to test-upload.ts
+        payload = {
+            'data': {
+                'timestamp': depth_data_dict['timestamp'],
+                'baseImage': base_image_b64,
+                'depthImage': depth_image_b64,
+                'depthData': {
+                    'shape': depth_data_dict['shape'],
+                    'dtype': depth_data_dict['dtype'],
+                    'min': depth_data_dict['min'],
+                    'max': depth_data_dict['max'],
+                    'mean': depth_data_dict['mean'],
+                    'valid_pixels': depth_data_dict['valid_pixels']
+                }
+            },
+            'signature': '0x0000000000000000000000000000000000000000000000000000000000000000'  # Placeholder signature
+        }
+        
+        # Post to server
+        upload_url = f"{server_url}/api/upload"
+        response = requests.post(upload_url, json=payload, headers={'Content-Type': 'application/json'}, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            print(f"✅ Upload successful! PieceCID: {result.get('data', {}).get('pieceCid', 'N/A')}")
+            return True, result
+        else:
+            print(f"❌ Upload failed with status {response.status_code}: {response.text}")
+            return False, None
+            
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Network error during upload: {e}")
+        return False, None
+    except Exception as e:
+        print(f"❌ Error during upload: {e}")
+        return False, None
 
 def run_five_view():
     """Run stereo depth with 5-view output"""
@@ -280,7 +363,23 @@ def run_five_view():
             print(f"✓ Saved other views: {other_filename}")
             
             # Save depth data
-            depth_file, json_file = save_depth_data(disparity, timestamp)
+            depth_file, json_file, depth_data_dict = save_depth_data(disparity, timestamp)
+            
+            # Show popup message and upload to server
+            server_url = os.getenv('SERVER_URL', 'http://localhost:3000')
+            popup_message = "Witness image captured,\nsigning and sending it to\nFilecoinOnchain Cloud"
+            
+            # Show popup message
+            show_popup_message(five_view, popup_message, duration=3)
+            
+            # Upload to server
+            print(f"\n📤 Uploading to server: {server_url}")
+            success, result = upload_to_server(left_filename, depth_data_dict, depth_color, server_url)
+            
+            if success:
+                print(f"✅ Upload complete!\n")
+            else:
+                print(f"⚠️ Upload failed, but files saved locally.\n")
             
             capture_count += 1
             print(f"✓ Capture #{capture_count} complete!\n")
