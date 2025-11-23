@@ -2,7 +2,7 @@
 
 **Proof of IRL** - Cryptographic proof of physical reality
 
-i-witness is a decentralized system for capturing, storing, and verifying authentic images and depth data secured by hardware-attested signatures. The system uses stereo cameras to capture synchronized frames, generates depth maps, cryptographically signs the data, and stores it on Filecoin for permanent, verifiable proof of physical reality.
+i-witness is an opensource hardware system for capturing, storing, and verifying authentic images and depth data secured by hardware-attested signatures. The system uses stereo cameras to capture synchronized frames, generates depth maps, cryptographically signs the data, and stores it on Filecoin for permanent, verifiable proof of physical reality.
 
 ## Features
 
