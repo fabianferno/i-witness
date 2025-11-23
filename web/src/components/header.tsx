@@ -5,7 +5,7 @@ import Image from "next/image";
 
 export function Header() {
     return (
-        <header className="sticky top-0 z-50 w-full border-b border-zinc-800/40 rounded-full max-w-2xl mx-auto bg-black/10 top-2 backdrop-blur-xl supports-[backdrop-filter]:bg-black/5">
+        <header className="sticky top-2 z-50 w-full border-b border-zinc-800/40 rounded-full max-w-2xl mx-auto bg-black/10 backdrop-blur-xl supports-backdrop-filter:bg-black/5">
             <div className="container flex h-14 max-w-7xl mx-auto items-center justify-center">
                 <nav className="flex items-center justify-center gap-2 text-sm font-medium">
                     <Link

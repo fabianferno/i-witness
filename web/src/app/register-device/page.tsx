@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAddSubname, useIsSubnameAvailable } from "@justaname.id/react";
-import { useDebounce } from "@uidotdev/usehooks"; // Need to install this or implement simple debounce
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,67 +12,28 @@ import { Loader2, CheckCircle2, AlertCircle, Copy, RefreshCw } from "lucide-reac
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { toast } from "sonner";
 
-function useSimpleDebounce<T>(value: T, delay: number): T {
-    const [debouncedValue, setDebouncedValue] = useState(value);
+function RegisterDeviceForm() {
+    const [label, setLabel] = useState("");
+    const [debouncedLabel, setDebouncedLabel] = useState("");
 
-    useState(() => {
+    // Proper debounce implementation using useEffect
+    useEffect(() => {
         const handler = setTimeout(() => {
-            setDebouncedValue(value);
-        }, delay);
+            setDebouncedLabel(label);
+        }, 500);
 
         return () => {
             clearTimeout(handler);
         };
+    }, [label]);
+
+    // Hooks can be called here because this component only renders after mount
+    const subnameCheck = useIsSubnameAvailable({
+        username: debouncedLabel || '',
     });
+    const isSubnameAvailable = debouncedLabel ? subnameCheck.isSubnameAvailable : undefined;
 
-    return debouncedValue;
-}
-
-export default function RegisterDevicePage() {
-    const [label, setLabel] = useState("");
-    // const debouncedLabel = useDebounce(label, 500); // Using simple implementation below to avoid extra dep if possible, or I'll just use the one from the docs if I install it.
-    // Actually I didn't install @uidotdev/usehooks. I'll use a custom hook or install it.
-    // Let's use a custom hook for now to save an install or I can install it.
-    // The docs used it, so maybe I should have installed it. I'll implement a simple one.
-    const [debouncedLabel, setDebouncedLabel] = useState(label);
-
-    // Simple debounce effect
-    if (debouncedLabel !== label) {
-        const handler = setTimeout(() => setDebouncedLabel(label), 500);
-        // This is not a correct way to implement debounce in render body.
-        // I will use useEffect.
-    }
-
-    // Correct debounce implementation
-    const [dLabel, setDLabel] = useState(label);
-
-    // I'll just use a useEffect to debounce
-    // useEffect(() => {
-    //   const handler = setTimeout(() => setDLabel(label), 500);
-    //   return () => clearTimeout(handler);
-    // }, [label]);
-
-    // Wait, I can't use hooks inside the component body like that if I want to be clean.
-    // I'll just implement the component properly.
-
-    return <RegisterDeviceContent />;
-}
-
-function RegisterDeviceContent() {
-    const [label, setLabel] = useState("");
-    const [debouncedLabel, setDebouncedLabel] = useState("");
-
-    // Debounce logic
-    const updateLabel = (val: string) => {
-        setLabel(val);
-        setTimeout(() => setDebouncedLabel(val), 500);
-    };
-
-    const { isSubnameAvailable, isLoading: isChecking } = useIsSubnameAvailable({
-        username: debouncedLabel,
-    });
-
-    const { addSubname, isPending: isRegistering } = useAddSubname();
+    const { addSubname } = useAddSubname();
 
     const [generatedKey, setGeneratedKey] = useState<{ privateKey: string; address: string } | null>(null);
     const [registrationSuccess, setRegistrationSuccess] = useState<{ fullDomain: string } | null>(null);
@@ -101,7 +62,7 @@ function RegisterDeviceContent() {
             setError(null);
             await addSubname({
                 username: label,
-                address: generatedKey.address as `0x${string}`,
+                addresses: { '60': generatedKey.address },
             });
             setRegistrationSuccess({ fullDomain: `${label}.iwitness.eth` });
             toast.success("Device registered successfully!");
@@ -182,7 +143,7 @@ function RegisterDeviceContent() {
                             <Input
                                 id="label"
                                 value={label}
-                                onChange={(e) => updateLabel(e.target.value)}
+                                onChange={(e) => setLabel(e.target.value)}
                                 className="focus:ring-0 focus:border-0 focus:ring-offset-0 focus:ring-offset-black/10"
                                 placeholder="e.g. camera-01"
                                 disabled={!generatedKey || !!registrationSuccess}
@@ -191,11 +152,7 @@ function RegisterDeviceContent() {
                         </div>
                         {debouncedLabel && (
                             <div className="text-xs h-4">
-                                {isChecking ? (
-                                    <span className="text-zinc-500 flex items-center">
-                                        <Loader2 className="h-3 w-3 animate-spin mr-1" /> Checking availability...
-                                    </span>
-                                ) : isSubnameAvailable ? (
+                                {isSubnameAvailable ? (
                                     <span className="text-green-600 flex items-center">
                                         <CheckCircle2 className="h-3 w-3 mr-1" /> Available
                                     </span>
@@ -229,19 +186,40 @@ function RegisterDeviceContent() {
                     <Button
                         onClick={handleRegister}
                         className="w-full"
-                        disabled={!generatedKey || !label || !isSubnameAvailable || isRegistering || !!registrationSuccess}
+                        disabled={!generatedKey || !label || !isSubnameAvailable || !!registrationSuccess}
                     >
-                        {isRegistering ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Registering...
-                            </>
-                        ) : (
-                            "Register Device"
-                        )}
+                        Register Device
                     </Button>
                 </CardContent>
             </Card>
         </div>
     );
 }
+
+function RegisterDeviceContent() {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) {
+        return (
+            <div className="flex min-h-screen items-center justify-center p-4">
+                <Card className="w-full max-w-md bg-black/10">
+                    <CardHeader>
+                        <CardTitle className="text-zinc-900">Register Device</CardTitle>
+                        <CardDescription className="text-zinc-700">
+                            Loading...
+                        </CardDescription>
+                    </CardHeader>
+                </Card>
+            </div>
+        );
+    }
+
+    return <RegisterDeviceForm />;
+}
+
+export default RegisterDeviceContent;
+

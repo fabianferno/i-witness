@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-export default function VerifyPage({ params }: { params: { cid: string } }) {
+export default async function VerifyPage({ params }: { params: Promise<{ cid: string }> }) {
+    const { cid } = await params;
     return (
         <main className="min-h-screen bg-background p-4 md:p-8">
             <div className="max-w-6xl mx-auto space-y-8">
@@ -16,7 +17,7 @@ export default function VerifyPage({ params }: { params: { cid: string } }) {
                     <h1 className="text-2xl font-bold tracking-tight">Verification Report</h1>
                 </div>
 
-                <VerificationResults cid={params.cid} />
+                <VerificationResults cid={cid} />
             </div>
         </main>
     );
