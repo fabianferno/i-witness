@@ -123,11 +123,7 @@ export function PostsList() {
 
   if (loading) {
     return (
-      <div className="w-full max-w-5xl space-y-6 my-24">
-        <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold text-zinc-900">Recent Uploads</h2>
-          <div className="text-sm text-zinc-500">Loading...</div>
-        </div>
+      <div className="w-full max-w-5xl space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="bg-black/10 border-zinc-800 animate-pulse">
@@ -144,10 +140,7 @@ export function PostsList() {
 
   if (error) {
     return (
-      <div className="w-full max-w-5xl space-y-6 my-24">
-        <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold text-zinc-900">Recent Uploads</h2>
-        </div>
+      <div className="w-full max-w-5xl space-y-6">
         <Card className="bg-red-500/10 border-red-500/30">
           <CardContent className="p-4">
             <p className="text-red-200">Error: {error}</p>
@@ -159,11 +152,7 @@ export function PostsList() {
 
   if (posts.length === 0) {
     return (
-      <div className="w-full max-w-5xl space-y-6 my-24">
-        <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold text-zinc-900">Recent Uploads</h2>
-          <div className="text-sm text-zinc-500">No uploads yet</div>
-        </div>
+      <div className="w-full max-w-5xl space-y-6">
         <Card className="bg-black/10 border-zinc-800">
           <CardContent className="p-8 text-center">
             <Database className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
@@ -175,25 +164,20 @@ export function PostsList() {
   }
 
   return (
-    <div className="w-full max-w-5xl space-y-6 my-24">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold text-zinc-900">Recent Uploads</h2>
-        <div className="text-sm text-zinc-500">{posts.length} {posts.length === 1 ? 'upload' : 'uploads'}</div>
-      </div>
-
+    <div className="w-full max-w-5xl space-y-6 mt-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {posts.map((post) => (
-          <Card key={post._id} className="bg-black/10 border-zinc-800 hover:bg-black/20 transition-all overflow-hidden group">
+          <Card key={post._id} className="bg-black/10 !py-0 border-zinc-800 hover:bg-black/20 transition-all overflow-hidden group">
             <CardContent className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-zinc-400" />
-                  <Badge className="bg-zinc-900/50 text-zinc-200 border-zinc-700">
+                  <FileText className="w-4 h-4 text-zinc-900" />
+                  <Badge className="bg-zinc-900/70 text-zinc-200 border-zinc-700">
                     {post.mimeType?.split('/')[1]?.toUpperCase() || 'FILE'}
                   </Badge>
                 </div>
                 {post.signature && (
-                  <Badge className="bg-green-500/20 text-green-200 border-green-500/30">
+                  <Badge className="bg-green-900/50 text-green-200 border-green-500/30">
                     Signed
                   </Badge>
                 )}
@@ -201,8 +185,8 @@ export function PostsList() {
 
               <div className="space-y-2 mb-3">
                 <div>
-                  <p className="text-xs text-zinc-400 mb-1">Hash (CID)</p>
-                  <p className="text-sm font-mono text-zinc-200 break-all">
+                  <p className="text-xs text-zinc-700 mb-1">Hash (CID)</p>
+                  <p className="text-sm font-mono text-zinc-900 break-all">
                     {typeof post.hash === 'string' ? post.hash : String(post.hash || 'Unknown')}
                   </p>
                 </div>
@@ -233,7 +217,7 @@ export function PostsList() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="w-full bg-zinc-900/50 hover:bg-zinc-800 border-zinc-700 text-zinc-200"
+                      className="w-full bg-black hover:bg-zinc-800 hover:text-white border-zinc-700 text-zinc-200"
                       onClick={() => handleOpenDialog(post)}
                     >
                       <Download className="w-3 h-3 mr-2" />

@@ -15,8 +15,8 @@ export default function Home() {
       </div>
 
       <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex flex-col gap-12">
-        <div className="text-center space-y-6 max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/50 border border-zinc-800 text-white text-xs uppercase tracking-wider mb-4">
+        <div className="text-center space-y-6 max-w-2xl mx-auto mb-5">
+          <div className="inline-flex mt-12 items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/50 border border-zinc-800 text-white text-xs uppercase tracking-wider mb-4">
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             System Online
           </div>
@@ -36,7 +36,12 @@ export default function Home() {
 
         <PostsList />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full mt-12">
+
+        <h1 className="text-3xl mt-24 mb-2 font-bold text-zinc-900">
+          Why is this cool?
+        </h1>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
           <FeatureCard
             icon={<Camera className="w-6 h-6 text-zinc-200" />}
             title="Stereo Capture"

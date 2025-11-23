@@ -51,7 +51,7 @@ const RECENT_PIRLS: Pirl[] = [
 
 export function RecentPirls() {
     return (
-        <div className="w-full max-w-5xl space-y-6 my-24">
+        <div className="w-full max-w-5xl space-y-6 mt-24">
             <div className="flex items-center justify-between">
                 <h2 className="text-3xl font-bold text-zinc-900">Recent PIRLs</h2>
                 <div className="text-sm text-zinc-500">Live Feed</div>
