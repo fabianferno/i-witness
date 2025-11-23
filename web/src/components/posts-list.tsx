@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,8 +12,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Database, Clock, FileText, Download, Loader2, Image as ImageIcon } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { Database, Clock, FileText, Download, Loader2, Image as ImageIcon, Info, Hash, Layers, Activity, Maximize2, Minimize2, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
+import { verifySignature } from "@/lib/utils";
+import { useEnsName } from "wagmi";
+import { sepolia } from "viem/chains";
 
 interface Post {
   _id: string;
@@ -49,10 +52,6 @@ export function PostsList() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [contentData, setContentData] = useState<unknown>(null);
-  const [contentLoading, setContentLoading] = useState(false);
-  const [contentError, setContentError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -75,6 +74,105 @@ export function PostsList() {
     fetchPosts();
   }, []);
 
+  if (loading) {
+    return (
+      <div className="w-full max-w-6xl mx-auto space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="bg-zinc-900/50 border-zinc-800 animate-pulse">
+              <CardContent className="p-0">
+                <div className="h-48 bg-zinc-800/50 w-full" />
+                <div className="p-4 space-y-3">
+                  <div className="h-4 bg-zinc-800/50 rounded w-3/4" />
+                  <div className="h-3 bg-zinc-800/30 rounded w-1/2" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full max-w-6xl mx-auto space-y-6">
+        <Card className="bg-red-500/10 border-red-500/30">
+          <CardContent className="p-4">
+            <p className="text-red-200">Error: {error}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (posts.length === 0) {
+    return (
+      <div className="w-full max-w-6xl mx-auto space-y-6">
+        <Card className="bg-zinc-900/50 border-zinc-800">
+          <CardContent className="p-12 text-center">
+            <Database className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
+            <p className="text-zinc-500">No posts found. Uploads will appear here once files are uploaded to Filecoin.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full max-w-6xl mx-auto space-y-6 mt-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {posts.map((post) => (
+          <PostCard key={post._id} post={post} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+function PostCard({ post }: { post: Post }) {
+  const [contentData, setContentData] = useState<ContentData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [recoveredAddress, setRecoveredAddress] = useState<string | null>(null);
+
+  const { data: ensName } = useEnsName({
+    address: recoveredAddress as `0x${string}`,
+    chainId: sepolia.id,
+  });
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      if (!post.hash) return;
+
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/download/${post.hash}`);
+        const data = await response.json();
+
+        if (data.success) {
+          setContentData(data.data);
+        } else {
+          setError(data.error || 'Failed to fetch content');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch content');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContent();
+  }, [post.hash]);
+
+  useEffect(() => {
+    if (contentData?.data && contentData?.signature) {
+      const address = verifySignature(contentData.data, contentData.signature);
+      setRecoveredAddress(address);
+    }
+  }, [contentData]);
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -93,168 +191,123 @@ export function PostsList() {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
-  const fetchContent = async (cid: string) => {
-    setContentLoading(true);
-    setContentError(null);
-    setContentData(null);
-
-    try {
-      const response = await fetch(`/api/download/${cid}`);
-      const data = await response.json();
-
-      if (data.success) {
-        setContentData(data.data);
-      } else {
-        setContentError(data.error || 'Failed to fetch content');
-      }
-    } catch (err) {
-      setContentError(err instanceof Error ? err.message : 'Failed to fetch content');
-    } finally {
-      setContentLoading(false);
-    }
-  };
-
-  const handleOpenDialog = (post: Post) => {
-    setSelectedPost(post);
-    if (post.hash) {
-      fetchContent(post.hash);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="w-full max-w-5xl space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="bg-black/10 border-zinc-800 animate-pulse">
-              <CardContent className="p-4">
-                <div className="h-4 bg-zinc-800/50 rounded w-3/4 mb-2" />
-                <div className="h-3 bg-zinc-800/30 rounded w-1/2" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="w-full max-w-5xl space-y-6">
-        <Card className="bg-red-500/10 border-red-500/30">
-          <CardContent className="p-4">
-            <p className="text-red-200">Error: {error}</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (posts.length === 0) {
-    return (
-      <div className="w-full max-w-5xl space-y-6">
-        <Card className="bg-black/10 border-zinc-800">
-          <CardContent className="p-8 text-center">
-            <Database className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-            <p className="text-zinc-500">No posts found. Uploads will appear here once files are uploaded to Filecoin.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="w-full max-w-5xl space-y-6 mt-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {posts.map((post) => (
-          <Card key={post._id} className="bg-black/10 !py-0 border-zinc-800 hover:bg-black/20 transition-all overflow-hidden group">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-zinc-900" />
-                  <Badge className="bg-zinc-900/70 text-zinc-200 border-zinc-700">
-                    {post.mimeType?.split('/')[1]?.toUpperCase() || 'FILE'}
-                  </Badge>
-                </div>
-                {post.signature && (
-                  <Badge className="bg-green-900/50 text-green-200 border-green-500/30">
-                    Signed
-                  </Badge>
-                )}
-              </div>
+    <Card className="bg-black/10 py-0 border-zinc-800 hover:bg-black/20 transition-all overflow-hidden group flex flex-col h-full">
+      <div className="relative aspect-[4/3] w-full bg-zinc-900/50 overflow-hidden">
+        {loading ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-zinc-600" />
+          </div>
+        ) : contentData?.data?.baseImage ? (
+          <img
+            src={`data:image/png;base64,${contentData.data.baseImage}`}
+            alt="Base content"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-zinc-700">
+            <ImageIcon className="w-8 h-8 opacity-20" />
+          </div>
+        )}
 
-              <div className="space-y-2 mb-3">
-                <div>
-                  <p className="text-xs text-zinc-700 mb-1">Hash (CID)</p>
-                  <p className="text-sm font-mono text-zinc-900 break-all">
-                    {typeof post.hash === 'string' ? post.hash : String(post.hash || 'Unknown')}
-                  </p>
-                </div>
+        {/* Status Badge - Top Right */}
+        <div className="absolute top-2 right-2 flex gap-2">
+          {recoveredAddress ? (
+            <Badge className="bg-black/70 text-green-200 border-green-500/30 backdrop-blur-md shadow-sm hover:bg-green-500/30">
+              <CheckCircle2 className="w-3 h-3 mr-1" /> Verified
+            </Badge>
+          ) : post.signature ? (
+            <Badge className="bg-black/70 text-emerald-300 border-emerald-500/30 backdrop-blur-md shadow-sm">
+              Signed
+            </Badge>
+          ) : null}
+        </div>
 
-                {post.originalName && (
-                  <div>
-                    <p className="text-xs text-zinc-400 mb-1">Original Name</p>
-                    <p className="text-sm text-zinc-300 truncate">{post.originalName}</p>
-                  </div>
-                )}
-              </div>
+        {/* Gradient Overlay - Bottom */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-3 pt-12">
+          <div className="flex justify-between items-end">
+            <div>
+              <p className="text-xs text-zinc-200 font-mono mb-0.5">{formatDate(post.createdAt)}</p>
+              <p className="text-xs text-zinc-400 font-mono truncate w-32">{post.hash}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md shadow-lg transition-all"
+                  >
+                    <Info className="w-4 h-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 bg-zinc-950 border-zinc-800 overflow-hidden flex flex-col">
+                  <DialogHeader className="p-6 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-xl sticky top-0 z-10">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
+                        <FileText className="w-5 h-5 text-zinc-100" />
+                      </div>
+                      <div>
+                        <DialogTitle className="text-xl font-semibold text-zinc-100">
+                          {post.originalName || 'Content Details'}
+                        </DialogTitle>
+                        <DialogDescription className="text-zinc-400 font-mono text-xs mt-1 flex items-center gap-2">
+                          <Hash className="w-3 h-3" />
+                          {post.hash}
+                        </DialogDescription>
+                      </div>
+                    </div>
+                  </DialogHeader>
 
-              <div className="flex items-center justify-between pt-3 border-t border-zinc-800/50">
-                <div className="flex items-center gap-2 text-xs text-zinc-500">
-                  <Clock className="w-3 h-3" />
-                  {formatDate(post.createdAt)}
-                </div>
-                {post.size && (
-                  <div className="text-xs text-zinc-500">
-                    {formatFileSize(post.size)}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-3 pt-3 border-t border-zinc-800/50">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full bg-black hover:bg-zinc-800 hover:text-white border-zinc-700 text-zinc-200"
-                      onClick={() => handleOpenDialog(post)}
-                    >
-                      <Download className="w-3 h-3 mr-2" />
-                      View Content
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-zinc-900 border-zinc-800">
-                    <DialogHeader>
-                      <DialogTitle className="text-zinc-100">CID Content</DialogTitle>
-                      <DialogDescription className="text-zinc-400">
-                        {selectedPost?.hash}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="mt-4">
-                      {contentLoading && (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
-                          <span className="ml-2 text-zinc-400">Loading content...</span>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="p-6">
+                      {loading && (
+                        <div className="flex flex-col items-center justify-center py-20">
+                          <Loader2 className="w-8 h-8 animate-spin text-zinc-500 mb-4" />
+                          <span className="text-zinc-500">Loading content details...</span>
                         </div>
                       )}
-                      {contentError && (
-                        <div className="bg-red-500/10 border border-red-500/30 rounded p-4">
-                          <p className="text-red-200">Error: {contentError}</p>
+
+                      {error && (
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 flex items-center gap-4">
+                          <div className="p-3 bg-red-500/20 rounded-full">
+                            <Activity className="w-6 h-6 text-red-400" />
+                          </div>
+                          <div>
+                            <h4 className="text-red-200 font-medium">Failed to load content</h4>
+                            <p className="text-red-300/70 text-sm mt-1">{error}</p>
+                          </div>
                         </div>
                       )}
-                      {contentData !== null && !contentLoading && (
-                        <ContentDisplay data={contentData as ContentData} />
+
+                      {contentData && !loading && (
+                        <ContentDisplay data={contentData} />
                       )}
                     </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+
+      <CardContent className="p-3 border-t border-zinc-800/50 bg-black/20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <FileText className="w-3 h-3 text-zinc-500 shrink-0" />
+            <p className="text-xs text-zinc-300 truncate font-medium">
+              {ensName || post.originalName || 'Untitled'}
+            </p>
+          </div>
+          {post.size && (
+            <span className="text-[10px] text-zinc-500 font-mono shrink-0">
+              {formatFileSize(post.size)}
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -265,6 +318,15 @@ function ContentDisplay({ data }: { data: ContentData }) {
   const depthImage = data.data?.depthImage;
   const timestamp = data.data?.timestamp;
   const signature = data.signature;
+  const [isJsonOpen, setIsJsonOpen] = useState(false);
+  const [recoveredAddress, setRecoveredAddress] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (data.data && data.signature) {
+      const address = verifySignature(data.data, data.signature);
+      setRecoveredAddress(address);
+    }
+  }, [data]);
 
   // Prepare chart data for depth statistics
   const depthStatsData = depthData ? [
@@ -281,174 +343,226 @@ function ContentDisplay({ data }: { data: ContentData }) {
 
   const pixelData = [
     { name: 'Valid', value: depthData?.valid_pixels || 0, color: '#10b981' },
-    { name: 'Invalid', value: (totalPixels - (depthData?.valid_pixels || 0)), color: '#6b7280' },
+    { name: 'Invalid', value: (totalPixels - (depthData?.valid_pixels || 0)), color: '#3f3f46' },
   ];
 
-  const COLORS = ['#10b981', '#6b7280'];
+  const COLORS = ['#10b981', '#3f3f46'];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Images Section */}
       {(baseImage || depthImage) && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-            <ImageIcon className="w-5 h-5" />
-            Images
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {baseImage && (
-              <div className="bg-zinc-950 border border-zinc-800 rounded p-4">
-                <p className="text-sm text-zinc-400 mb-2">Base Image</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {baseImage && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4" />
+                  Base Image
+                </h3>
+                <Badge variant="outline" className="bg-zinc-900 text-zinc-500 border-zinc-800">RGB</Badge>
+              </div>
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden aspect-video relative group">
                 <img
                   src={`data:image/png;base64,${baseImage}`}
                   alt="Base image"
-                  className="w-full h-auto rounded border border-zinc-700"
+                  className="w-full h-full object-contain bg-black/20"
                 />
+                <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-xl pointer-events-none" />
               </div>
-            )}
-            {depthImage && (
-              <div className="bg-zinc-950 border border-zinc-800 rounded p-4">
-                <p className="text-sm text-zinc-400 mb-2">Depth Image</p>
+            </div>
+          )}
+          {depthImage && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                  <Layers className="w-4 h-4" />
+                  Depth Map
+                </h3>
+                <Badge variant="outline" className="bg-zinc-900 text-zinc-500 border-zinc-800">Depth</Badge>
+              </div>
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden aspect-video relative group">
                 <img
                   src={`data:image/png;base64,${depthImage}`}
                   alt="Depth image"
-                  className="w-full h-auto rounded border border-zinc-700"
+                  className="w-full h-full object-contain bg-black/20"
                 />
+                <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-xl pointer-events-none" />
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Depth Data Statistics */}
       {depthData && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-zinc-100">Depth Data Statistics</h3>
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 pb-2 border-b border-zinc-800/50">
+            <Activity className="w-5 h-5 text-indigo-400" />
+            <h3 className="text-lg font-semibold text-zinc-100">Depth Analysis</h3>
+          </div>
 
-          {/* Basic Info */}
+          {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-zinc-950 border border-zinc-800 rounded p-3">
-              <p className="text-xs text-zinc-400 mb-1">Shape</p>
-              <p className="text-sm font-mono text-zinc-200">
-                {depthData.shape.join(' × ')}
-              </p>
-            </div>
-            <div className="bg-zinc-950 border border-zinc-800 rounded p-3">
-              <p className="text-xs text-zinc-400 mb-1">Data Type</p>
-              <p className="text-sm font-mono text-zinc-200">{depthData.dtype}</p>
-            </div>
-            <div className="bg-zinc-950 border border-zinc-800 rounded p-3">
-              <p className="text-xs text-zinc-400 mb-1">Valid Pixels</p>
-              <p className="text-sm font-mono text-zinc-200">
-                {depthData.valid_pixels.toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-zinc-950 border border-zinc-800 rounded p-3">
-              <p className="text-xs text-zinc-400 mb-1">Coverage</p>
-              <p className="text-sm font-mono text-zinc-200">
-                {validPixelsPercentage.toFixed(2)}%
-              </p>
-            </div>
+            <StatsCard label="Dimensions" value={depthData.shape.join(' × ')} icon={<Maximize2 className="w-3 h-3" />} />
+            <StatsCard label="Data Type" value={depthData.dtype} icon={<Database className="w-3 h-3" />} />
+            <StatsCard label="Valid Pixels" value={depthData.valid_pixels.toLocaleString()} icon={<Activity className="w-3 h-3" />} />
+            <StatsCard label="Coverage" value={`${validPixelsPercentage.toFixed(1)}%`} icon={<PieChart className="w-3 h-3" />} />
           </div>
 
           {/* Charts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Depth Statistics Bar Chart */}
             {depthStatsData.length > 0 && (
-              <div className="bg-zinc-950 border border-zinc-800 rounded p-4">
-                <p className="text-sm text-zinc-400 mb-4">Depth Value Statistics</p>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={depthStatsData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis dataKey="name" stroke="#9ca3af" />
-                    <YAxis stroke="#9ca3af" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1f2937',
-                        border: '1px solid #374151',
-                        borderRadius: '6px',
-                        color: '#f3f4f6',
-                      }}
-                    />
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                      {depthStatsData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <Card className="bg-zinc-900/30 border-zinc-800/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-zinc-400">Value Distribution</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[200px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={depthStatsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                        <XAxis dataKey="name" stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
+                        <Tooltip
+                          cursor={{ fill: '#27272a' }}
+                          contentStyle={{
+                            backgroundColor: '#18181b',
+                            border: '1px solid #27272a',
+                            borderRadius: '8px',
+                            color: '#f4f4f5',
+                            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                          }}
+                        />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
+                          {depthStatsData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Valid Pixels Pie Chart */}
             {pixelData.length > 0 && totalPixels > 0 && (
-              <div className="bg-zinc-950 border border-zinc-800 rounded p-4">
-                <p className="text-sm text-zinc-400 mb-4">Pixel Coverage</p>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={pixelData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${percent ? (percent * 100).toFixed(1) : 0}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {pixelData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1f2937',
-                        border: '1px solid #374151',
-                        borderRadius: '6px',
-                        color: '#f3f4f6',
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              <Card className="bg-zinc-900/30 border-zinc-800/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-zinc-400">Data Quality</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[200px] w-full flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pixelData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                          stroke="none"
+                        >
+                          {pixelData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#18181b',
+                            border: '1px solid #27272a',
+                            borderRadius: '8px',
+                            color: '#f4f4f5',
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
         </div>
       )}
 
-      {/* Metadata */}
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold text-zinc-100">Metadata</h3>
-        <div className="bg-zinc-950 border border-zinc-800 rounded p-4 space-y-2">
-          {timestamp && (
-            <div className="flex justify-between">
-              <span className="text-sm text-zinc-400">Timestamp:</span>
-              <span className="text-sm text-zinc-200 font-mono">
-                {new Date(timestamp).toLocaleString()}
-              </span>
+      {/* Metadata & Signature */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            Timestamp
+          </h3>
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+            <p className="text-zinc-200 font-mono text-sm">
+              {timestamp ? new Date(timestamp).toLocaleString() : 'N/A'}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Signature
+            {recoveredAddress && (
+              <Badge className="ml-auto bg-emerald-500/20 text-emerald-300 border-emerald-500/30 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                Verified
+              </Badge>
+            )}
+          </h3>
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 group relative overflow-hidden space-y-2">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500 uppercase tracking-wider">Signer</span>
+              <p className="text-zinc-200 font-mono text-xs break-all">
+                {recoveredAddress || 'Verifying...'}
+              </p>
             </div>
-          )}
-          {signature && (
-            <div className="flex justify-between">
-              <span className="text-sm text-zinc-400">Signature:</span>
-              <span className="text-sm text-zinc-200 font-mono break-all">
-                {signature.substring(0, 20)}...{signature.substring(signature.length - 20)}
-              </span>
+            <div className="flex flex-col gap-1 border-t border-zinc-800/50 pt-2">
+              <span className="text-xs text-zinc-500 uppercase tracking-wider">Signature Hash</span>
+              <p className="text-zinc-400 font-mono text-[10px] break-all opacity-70 group-hover:opacity-100 transition-opacity">
+                {signature || 'No signature available'}
+              </p>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
       {/* Raw JSON (collapsible) */}
-      <details className="bg-zinc-950 border border-zinc-800 rounded p-4">
-        <summary className="text-sm text-zinc-400 cursor-pointer hover:text-zinc-300">
-          View Raw JSON
-        </summary>
-        <pre className="text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap wrap-break-word mt-4">
-          {JSON.stringify(data, null, 2)}
-        </pre>
-      </details>
+      <div className="border-t border-zinc-800/50 pt-6">
+        <button
+          onClick={() => setIsJsonOpen(!isJsonOpen)}
+          className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors w-full"
+        >
+          {isJsonOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          {isJsonOpen ? 'Hide Raw Data' : 'View Raw Data'}
+        </button>
+
+        {isJsonOpen && (
+          <div className="mt-4 bg-zinc-950 border border-zinc-800 rounded-xl p-4 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+            <pre className="text-[10px] text-zinc-400 font-mono overflow-x-auto whitespace-pre-wrap custom-scrollbar max-h-[300px]">
+              {JSON.stringify(data, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
+function StatsCard({ label, value, icon }: { label: string, value: string | number, icon: React.ReactNode }) {
+  return (
+    <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-xl p-4 flex flex-col gap-2 hover:bg-zinc-900/50 transition-colors">
+      <div className="flex items-center gap-2 text-zinc-500 text-xs font-medium uppercase tracking-wider">
+        {icon}
+        {label}
+      </div>
+      <div className="text-zinc-100 font-mono text-lg font-semibold truncate">
+        {value}
+      </div>
+    </div>
+  );
+}
