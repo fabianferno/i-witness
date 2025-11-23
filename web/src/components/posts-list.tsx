@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Database, Clock, FileText, Download, Loader2, Image as ImageIcon, Info, Hash, Layers, Activity, Maximize2, Minimize2, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
-import { verifySignature } from "@/lib/utils";
+import { verifySignature, addMetadataToPng } from "@/lib/utils";
 import { useEnsName } from "wagmi";
 import { sepolia } from "viem/chains";
 
@@ -136,6 +136,7 @@ function PostCard({ post }: { post: Post }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recoveredAddress, setRecoveredAddress] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const { data: ensName } = useEnsName({
     address: recoveredAddress as `0x${string}`,
@@ -172,6 +173,63 @@ function PostCard({ post }: { post: Post }) {
       setRecoveredAddress(address);
     }
   }, [contentData]);
+
+  const handleDownload = async () => {
+    if (!contentData?.data?.baseImage) return;
+
+    setDownloading(true);
+    try {
+      // Create image from base64
+      const img = new Image();
+      img.src = `data:image/png;base64,${contentData.data.baseImage}`;
+      await new Promise((resolve) => { img.onload = resolve; });
+
+      // Create canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error("Could not get canvas context");
+
+      // Draw image
+      ctx.drawImage(img, 0, 0);
+
+      // Add Watermark
+      const fontSize = Math.max(20, Math.floor(img.width * 0.05));
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.lineWidth = fontSize / 10;
+
+      const text = "#PIRL";
+      const padding = fontSize;
+
+      ctx.strokeText(text, padding, padding + fontSize);
+      ctx.fillText(text, padding, padding + fontSize);
+
+      // Convert to blob
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error("Could not create image blob");
+
+      // Add Metadata
+      const blobWithMetadata = await addMetadataToPng(blob, "CID", post.hash);
+
+      // Download
+      const url = URL.createObjectURL(blobWithMetadata);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${post.originalName || 'image'}-pirl.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+    } catch (err) {
+      console.error("Download failed:", err);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -231,6 +289,19 @@ function PostCard({ post }: { post: Post }) {
               <p className="text-xs text-zinc-400 font-mono truncate w-32">{post.hash}</p>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDownload();
+                }}
+                disabled={downloading}
+                className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md shadow-lg transition-all"
+              >
+                {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              </Button>
+
               <Dialog>
                 <DialogTrigger asChild>
                   <Button
